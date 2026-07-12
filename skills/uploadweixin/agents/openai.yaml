@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upload Weixin"
+  short_description: "Rich-copy WeChat article layout"
+  default_prompt: "Use $uploadweixin to turn this Markdown article into WeChat Official Account friendly HTML, validate it, and provide the rich-copy preview or macOS clipboard path."
