@@ -8,6 +8,8 @@ import re
 from html.parser import HTMLParser
 from pathlib import Path
 
+from cli_feedback import check_input_file, fail
+
 
 BANNED_TAGS = {"script", "style", "iframe", "form", "input", "button"}
 BANNED_STYLE_PROPS = {"z-index"}
@@ -94,15 +96,16 @@ def main() -> int:
     args = parser.parse_args()
 
     path = Path(args.html_file).expanduser().resolve()
-    if not path.is_file():
-        print(f"FAIL missing file: {path}")
-        return 1
+    input_suggestions = check_input_file(path, "article.html 校验文件")
+    if input_suggestions:
+        return fail("article.html 校验文件不存在。", input_suggestions)
 
     errors = validate_html(path.read_text(encoding="utf-8"), args.expect_footer, args.footer_text)
     if errors:
         print("FAIL")
         for error in errors:
             print(f"- {error}")
+        print("- 建议：回到 render_wechat_article.py 重新生成，或按上方错误删除公众号不兼容的标签/样式。")
         return 1
 
     print(f"PASS validate file={path} expect_footer={args.expect_footer}")

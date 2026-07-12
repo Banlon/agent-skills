@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from cli_feedback import check_input_file, fail, prepare_output_dir, theme_error
+
 
 DEFAULT_FOOTER_TEXT = "多Agent记忆同步，请使用upload.one，支持GPT Claude。"
 SUPPORTED_THEMES = (
@@ -493,21 +495,39 @@ def render_article(input_path: Path, theme_name: str, footer: str, footer_text: 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render Markdown into WeChat-friendly HTML.")
     parser.add_argument("--input", required=True, help="Markdown input file.")
-    parser.add_argument("--theme", choices=SUPPORTED_THEMES, default="upload-clean", help="Theme name.")
+    parser.add_argument("--theme", default="upload-clean", help="Theme name.")
     parser.add_argument("--output", required=True, help="Output directory.")
     parser.add_argument("--footer", choices=("enabled", "disabled"), default="enabled", help="Append Upload footer.")
     parser.add_argument("--footer-text", default=DEFAULT_FOOTER_TEXT, help="Custom footer copy.")
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
-    if not input_path.is_file():
-        raise SystemExit(f"Input file not found: {input_path}")
+    input_suggestions = check_input_file(input_path, "Markdown 输入文件")
+    if input_suggestions:
+        return fail("Markdown 输入文件不存在。", input_suggestions)
+
+    if args.theme not in SUPPORTED_THEMES:
+        message, suggestions = theme_error(args.theme, SUPPORTED_THEMES)
+        return fail(message, suggestions)
 
     output_dir = Path(args.output).expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    ok, output_suggestions = prepare_output_dir(output_dir)
+    if not ok:
+        return fail("输出目录不可用。", output_suggestions)
+
     article_html = render_article(input_path, args.theme, args.footer, args.footer_text)
     article_path = output_dir / "article.html"
-    article_path.write_text(article_html + "\n", encoding="utf-8")
+    try:
+        article_path.write_text(article_html + "\n", encoding="utf-8")
+    except OSError as error:
+        return fail(
+            "写入 article.html 失败。",
+            [
+                f"目标路径：{article_path}",
+                f"系统返回：{error}",
+                "请确认输出目录可写，或改用 --output /tmp/wechat-output。",
+            ],
+        )
     print(f"PASS render article={article_path} theme={args.theme} footer={args.footer}")
     return 0
 

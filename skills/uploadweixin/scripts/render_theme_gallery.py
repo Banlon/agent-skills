@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from cli_feedback import check_input_file, fail, prepare_output_dir
 from make_preview import build_preview
 from render_wechat_article import DEFAULT_FOOTER_TEXT, SUPPORTED_THEMES, render_article
 from validate_wechat_html import validate_html
@@ -118,11 +119,15 @@ def main() -> int:
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
-    if not input_path.is_file():
-        raise SystemExit(f"Input file not found: {input_path}")
+    input_suggestions = check_input_file(input_path, "Markdown 输入文件")
+    if input_suggestions:
+        return fail("Markdown 输入文件不存在。", input_suggestions)
 
     output_dir = Path(args.output).expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    ok, output_suggestions = prepare_output_dir(output_dir)
+    if not ok:
+        return fail("批量主题输出目录不可用。", output_suggestions)
+
     results = render_all_themes(input_path, output_dir, args.footer, args.footer_text, args.expect_footer)
 
     for result in results:

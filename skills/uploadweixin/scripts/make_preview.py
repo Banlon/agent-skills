@@ -8,6 +8,8 @@ import html
 import json
 from pathlib import Path
 
+from cli_feedback import check_input_file, fail, prepare_output_dir
+
 
 def build_preview(article_html: str) -> str:
     escaped_source = html.escape(article_html)
@@ -165,13 +167,27 @@ def main() -> int:
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
-    if not input_path.is_file():
-        raise SystemExit(f"Input file not found: {input_path}")
+    input_suggestions = check_input_file(input_path, "article.html 输入文件")
+    if input_suggestions:
+        return fail("article.html 输入文件不存在。", input_suggestions)
 
     output_path = Path(args.output).expanduser().resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ok, output_suggestions = prepare_output_dir(output_path.parent)
+    if not ok:
+        return fail("preview.html 输出目录不可用。", output_suggestions)
+
     preview_html = build_preview(input_path.read_text(encoding="utf-8"))
-    output_path.write_text(preview_html, encoding="utf-8")
+    try:
+        output_path.write_text(preview_html, encoding="utf-8")
+    except OSError as error:
+        return fail(
+            "写入 preview.html 失败。",
+            [
+                f"目标路径：{output_path}",
+                f"系统返回：{error}",
+                "请确认输出目录可写，或改用 --output /tmp/wechat-output/preview.html。",
+            ],
+        )
     print(f"PASS preview={output_path}")
     return 0
 
